@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 def generate_simulated_data(num_bits=10000, prob_one=0.55):
     """
@@ -20,6 +21,17 @@ def generate_simulated_data(num_bits=10000, prob_one=0.55):
     
     return simulated_data
 
+
+
+
+def load_real_data(file_path):
+    print(f"-> Loading real data from: {file_path}")
+    
+    df = pd.read_csv(file_path)
+    
+    raw_bits = df.iloc[:, 0].values
+    
+    return raw_bits
 # If we run this file directly, do a small test
 if __name__ == "__main__":
     bit_finti = generate_simulated_data(num_bits=50000, prob_one=0.55)
