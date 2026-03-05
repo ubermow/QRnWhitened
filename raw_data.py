@@ -2,85 +2,85 @@ import time
 import os
 import sys
 
-# Tentativo di importazione con fallback chiaro per evitare panico da terminale
+# Import attempt with clear fallback to avoid terminal panic
 try:
     from TimeTagger import createTimeTagger, FileWriter, freeTimeTagger
 except ImportError:
-    print("[ERRORE CRITICO] Modulo TimeTagger non trovato.")
-    print("Assicurati di essere dentro il tuo ambiente virtuale (.venv) su Windows")
-    print("e di aver installato le librerie Swabian Instruments.")
+    print("[CRITICAL ERROR] TimeTagger module not found.")
+    print("Ensure you are inside your virtual environment (.venv) on Windows")
+    print("and have successfully installed the Swabian Instruments libraries.")
     sys.exit(1)
 
 def acquire_raw_timestamps(duration_sec, filename, channels):
     """
-    Si connette in modo esclusivo all'FPGA, apre un flusso binario diretto
-    su disco (bypassando colli di bottiglia della CPU) e chiude con grazia.
+    Connects exclusively to the FPGA, opens a direct binary stream 
+    to disk (bypassing CPU bottlenecks), and closes gracefully.
     """
-    print("\n=== ACQUISIZIONE DATI QUANTISTICI GREZZI (RAW DUMP) ===")
-    print("-> Tentativo di connessione al Time Tagger...")
+    print("\n=== QUANTUM RAW DATA ACQUISITION (RAW DUMP) ===")
+    print("-> Attempting connection to the Time Tagger...")
     
     try:
-        # Prende il controllo fisico dell'hardware
+        # Takes physical control of the hardware
         tagger = createTimeTagger()
     except Exception as e:
-        print("\n[ERRORE DI CONNESSIONE] Impossibile accedere all'FPGA.")
-        print(f"Dettaglio: {e}")
-        print("SOLUZIONE OBBLIGATORIA: Devi chiudere completamente il software")
-        print("interfaccia grafica Thorlabs EDU-QOP1 prima di lanciare questo script.")
+        print("\n[CONNECTION ERROR] Cannot access the FPGA.")
+        print(f"Details: {e}")
+        print("MANDATORY SOLUTION: You must completely close the Thorlabs EDU-QOP1")
+        print("GUI software before running this script.")
         return
 
-    print(f"-> Connessione stabilita. Inizializzazione stream binario sui canali {channels}...")
-    print(f"-> File di destinazione: {filename}")
+    print(f"-> Connection established. Initializing binary stream on channels {channels}...")
+    print(f"-> Target file: {filename}")
     
-    # Il FileWriter delega la scrittura direttamente al backend C++/FPGA
+    # FileWriter delegates writing directly to the C++/FPGA backend
     writer = FileWriter(tagger, filename, channels)
     
-    print(f"-> Acquisizione in corso per {duration_sec} secondi. NON CHIUDERE LA FINESTRA...")
+    print(f"-> Acquisition in progress for {duration_sec} seconds. DO NOT CLOSE THIS WINDOW...")
     
     try:
-        # Il loop serve solo per dare un feedback visivo al ricercatore,
-        # la scrittura vera e propria avviene in modo asincrono in background.
+        # The loop merely provides visual feedback to the researcher;
+        # actual writing is asynchronous in the background.
         for i in range(duration_sec):
             time.sleep(1)
             if (i + 1) % 10 == 0:
-                print(f"   ... {i + 1} secondi trascorsi ...")
+                print(f"   ... {i + 1} seconds elapsed ...")
                 
     except KeyboardInterrupt:
-        # Questo blocco intercetta il comando di blocco manuale (Ctrl+C)
-        print("\n[ATTENZIONE] Interruzione manuale richiesta dall'utente (Ctrl+C).")
-        print("-> Salvataggio dei dati parziali in corso...")
+        # This block intercepts the manual stop command (Ctrl+C)
+        print("\n[WARNING] Manual interruption requested by the user (Ctrl+C).")
+        print("-> Saving partial data...")
 
     finally:
-        # Il blocco 'finally' viene eseguito SEMPRE, sia alla fine del tempo,
-        # sia in caso di interruzione manuale o errore imprevisto.
-        # È vitale per non lasciare la porta USB bloccata in stato "zombie".
-        print("-> Chiusura del flusso dati e svuotamento dei buffer hardware...")
+        # The 'finally' block is ALWAYS executed, whether the time ends naturally,
+        # or upon manual interruption/error. Vital to avoid leaving the 
+        # USB port locked in a "zombie" state.
+        print("-> Closing data stream and flushing hardware buffers...")
         writer.stop()
         freeTimeTagger(tagger)
         
         if os.path.exists(filename):
             file_size_mb = os.path.getsize(filename) / (1024 * 1024)
-            print("-> Acquisizione terminata correttamente e hardware rilasciato.")
-            print(f"-> Dimensione file binario generato: {file_size_mb:.2f} MB\n")
+            print("-> Acquisition completed successfully and hardware released.")
+            print(f"-> Generated binary file size: {file_size_mb:.2f} MB\n")
         else:
-            print("-> [ERRORE] Il file binario non è stato generato.\n")
+            print("-> [ERROR] The binary file was not generated.\n")
 
 # ==========================================
 # MAIN EXECUTION BLOCK
 # ==========================================
 if __name__ == '__main__':
-    # --- CONFIGURAZIONE SPERIMENTALE ---
+    # --- EXPERIMENTAL CONFIGURATION ---
     
-    # Scegli i canali fisici (BNC) da ascoltare. 
-    # Tipicamente 1 = Rivelatore T (Trigger), 2 = Rivelatore A (Alice).
-    TARGET_CHANNELS = [1, 2, 3] 
+    # Choose the physical (BNC) channels to listen to. 
+    # Typically 1 = Detector T (Trigger), 2 = Detector A (Alice).
+    TARGET_CHANNELS = [1, 2] 
     
-    # Nome del file di output. L'estensione .ttbin sta per TimeTagger Binary.
+    # Output filename. The .ttbin extension stands for TimeTagger Binary.
     OUTPUT_FILE = "raw_photons.ttbin" 
     
-    # Durata dell'esperimento in secondi.
-    # Inizia con 60 secondi per testare che tutto funzioni e valutare il peso in MB.
+    # Experiment duration in seconds.
+    # Start with 60 seconds to test the pipeline and evaluate the MB footprint.
     ACQUISITION_TIME = 60 
     
-    # Esecuzione
+    # Execute the acquisition
     acquire_raw_timestamps(ACQUISITION_TIME, OUTPUT_FILE, TARGET_CHANNELS)
