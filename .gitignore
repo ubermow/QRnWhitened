@@ -9,3 +9,18 @@ __pycache__/
 
 # Virtual Environments
 .venv/
+
+
+# Hardware Data Files
+*.ttbin
+*.idx
+*.csv
+*.dat
+
+# Python Virtual Environments
+.venv/
+qrng_env/
+__pycache__/
+
+# Windows System files
+Thumbs.db
