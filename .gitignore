@@ -16,6 +16,7 @@ __pycache__/
 *.idx
 *.csv
 *.dat
+*.bin
 
 # Python Virtual Environments
 .venv/
