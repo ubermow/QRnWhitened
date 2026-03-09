@@ -1,32 +1,88 @@
+import sys
+import os
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import poisson, chisquare, kstest, uniform
 
-def load_thorlabs_data(file_path):
+# ==========================================
+# 1. HARDWARE BRIDGE CONFIGURATION
+# ==========================================
+# Injecting the Swabian C++ passports. Without these, 
+# the FileReader will refuse to parse the binary .ttbin file.
+SWABIAN_PYTHON_PATH = r"C:\Program Files\Swabian Instruments\Time Tagger\driver\x64\python3.10"
+SWABIAN_ROOT_PATH = r"C:\Program Files\Swabian Instruments\Time Tagger"
+
+if SWABIAN_PYTHON_PATH not in sys.path:
+    sys.path.append(SWABIAN_PYTHON_PATH)
+if hasattr(os, 'add_dll_directory'):
+    os.add_dll_directory(SWABIAN_ROOT_PATH)
+    os.add_dll_directory(SWABIAN_PYTHON_PATH)
+
+try:
+    from TimeTagger import FileReader
+except ImportError:
+    print("[CRITICAL ERROR] TimeTagger FileReader could not be loaded.")
+    sys.exit(1)
+
+# ==========================================
+# 2. DATA LOADING MODULE (.TTBIN BINARY)
+# ==========================================
+def load_ttbin_data(file_path, target_channel=2, chunk_size=10000000):
     """
-    Loads timestamp data from the Thorlabs CSV export.
-    Assumes the file contains a column with relative timestamps.
+    Reads the proprietary Swabian .ttbin binary file and isolates 
+    photons from a specific channel. Converts picoseconds to seconds.
     """
-    print(f"-> Loading data from: {file_path}")
+    print(f"\n=== QUANTUM DATA LOADER ===")
+    print(f"-> Opening binary stream from: {file_path}")
+    
     try:
-        df = pd.read_csv(file_path, comment='#') 
-        # Extract the first column assuming it contains the timestamps in seconds
-        timestamps = df.iloc[:, 0].values 
-        print(f"-> Loaded {len(timestamps)} events.")
-        return timestamps
+        reader = FileReader(file_path)
     except Exception as e:
-        print(f"[ERROR] Could not load file: {e}")
+        print(f"[ERROR] Could not open file. Details: {e}")
         return np.array([])
 
+    target_timestamps = []
+    total_events_read = 0
+
+    print(f"-> Extracting photons for Channel {target_channel}...")
+    
+    # We read in chunks to prevent RAM overflow
+    while reader.hasData():
+        # getData returns a TimeTagStreamBuffer object, not a tuple!
+        buffer = reader.getData(chunk_size)
+        
+        # Explicitly extract the numpy arrays from the buffer object
+        channels = buffer.getChannels()
+        timestamps_ps = buffer.getTimestamps()
+        
+        total_events_read += len(channels)
+        
+        # Logical mask: Keep ONLY the photons from our target detector (Alice)
+        mask = (channels == target_channel)
+        
+        # Apply the mask and convert timestamps from picoseconds to seconds
+        filtered_seconds = timestamps_ps[mask] * 1e-12
+        target_timestamps.extend(filtered_seconds)
+
+    # Convert the collected list back into a high-performance NumPy array
+    final_array = np.array(target_timestamps)
+    
+    print(f"-> Total events scanned across all channels: {total_events_read}")
+    print(f"-> Usable photons isolated on Channel {target_channel}: {len(final_array)}")
+    
+    if len(final_array) > 0:
+        duration = final_array[-1] - final_array[0]
+        avg_rate = len(final_array) / duration
+        print(f"-> Average Count Rate (Channel {target_channel}): {avg_rate / 1000:.2f} kHz")
+
+    return final_array
+
+# ==========================================
+# 3. STATISTICAL VALIDATION MODULES
+# ==========================================
 def test_poissonian_statistics(timestamps, time_window=0.01):
     """
-    MACROSCOPIC REGIME VALIDATION
-    Checks if the photon arrival count follows a Poisson distribution.
-    
-    Args:
-        timestamps (array): Array of arrival times in seconds.
-        time_window (float): Integration time window (T) in seconds (e.g., 10ms).
+    MACROSCOPIC TEST: Verifies if the photon emission follows a Poisson distribution.
     """
     print(f"\n=== MACRO TEST: Poissonian Statistics (Window: {time_window*1000} ms) ===")
     
@@ -38,8 +94,6 @@ def test_poissonian_statistics(timestamps, time_window=0.01):
     print(f"-> Average counts per window (Lambda): {lambda_val:.2f}")
     
     max_count = int(np.max(counts))
-    
-    # Shift bin edges by -0.5 to perfectly center the bars on integers
     bin_edges = np.arange(-0.5, max_count + 1.5, 1.0)
     x_values = np.arange(0, max_count + 1)
     
@@ -48,8 +102,6 @@ def test_poissonian_statistics(timestamps, time_window=0.01):
                                    alpha=0.6, color='blue', label='Experimental Data')
     
     theoretical_pmf = poisson.pmf(x_values, lambda_val)
-    
-    # Using raw f-string (fr) to avoid LaTeX escape character warnings
     plt.plot(x_values, theoretical_pmf, 'r--', linewidth=2, 
              label=fr'Theoretical Poisson ($\lambda$={lambda_val:.2f})')
     
@@ -59,12 +111,9 @@ def test_poissonian_statistics(timestamps, time_window=0.01):
     plt.legend()
     plt.grid(alpha=0.3)
     
-    # Statistical Inference (Chi-Square Goodness of Fit)
     valid_indices = theoretical_pmf > 0
     obs = observed_freq[valid_indices]
     exp = theoretical_pmf[valid_indices]
-    
-    # Normalize expected to match observed sum
     exp = exp * (np.sum(obs) / np.sum(exp))
     
     chi2_stat, p_val = chisquare(f_obs=obs, f_exp=exp)
@@ -77,12 +126,7 @@ def test_poissonian_statistics(timestamps, time_window=0.01):
 
 def test_uniform_approximation(timestamps, micro_bin_width=20e-9):
     """
-    MICROSCOPIC REGIME VALIDATION
-    Checks if the arrival time within a small cycle is Uniformly distributed.
-    
-    Args:
-        timestamps (array): Array of arrival times in seconds.
-        micro_bin_width (float): The small interval T (e.g., 20ns).
+    MICROSCOPIC TEST: Verifies the irreducible randomness of the photon arrival times.
     """
     print(f"\n=== MICRO TEST: Uniform Approximation (Cycle: {micro_bin_width*1e9} ns) ===")
     
@@ -100,7 +144,6 @@ def test_uniform_approximation(timestamps, micro_bin_width=20e-9):
     plt.legend()
     plt.grid(alpha=0.3)
     
-    # Statistical Inference (Kolmogorov-Smirnov Test)
     ks_stat, p_val = kstest(normalized_times, 'uniform')
     
     print(f"-> Kolmogorov-Smirnov Test p-value: {p_val:.4e}")
@@ -109,11 +152,10 @@ def test_uniform_approximation(timestamps, micro_bin_width=20e-9):
     else:
         print("-> RESULT: WARNING. Slight deviation from Uniform detected.")
 
-def test_system_stationarity(timestamps, chunk_duration_sec=300, micro_bin_width=20e-9):
+def test_system_stationarity(timestamps, chunk_duration_sec=10, micro_bin_width=20e-9):
     """
-    STABILITY REGIME VALIDATION (STATIONARITY)
-    Slices a long dataset into chunks and evaluates the stability 
-    of the photon generation rate and uniformity over time.
+    STABILITY TEST: Slices the dataset into chunks to ensure the laser/crystal 
+    did not drift or malfunction during the acquisition.
     """
     print(f"\n=== STATIONARITY TEST: Evaluating repeatability over chunks of {chunk_duration_sec}s ===")
     
@@ -121,7 +163,7 @@ def test_system_stationarity(timestamps, chunk_duration_sec=300, micro_bin_width
     num_chunks = int(max_time // chunk_duration_sec)
     
     if num_chunks < 3:
-        print("[WARNING] The dataset is too short to test long-term stationarity.")
+        print("[WARNING] Dataset is too short (less than 3 chunks) to plot stationarity.")
         return
 
     chunk_times = []
@@ -171,32 +213,28 @@ def test_system_stationarity(timestamps, chunk_duration_sec=300, micro_bin_width
     plt.tight_layout()
 
 # ==========================================
-# MAIN EXECUTION BLOCK
+# 4. MAIN EXECUTION BLOCK (REAL DATA)
 # ==========================================
 if __name__ == "__main__":
-    FILENAME = "thorlabs_data_sample.csv" 
+    # Ensure this matches the exact name of the file you recorded
+    FILENAME = "half_raw_photons.ttbin" 
     
-    # --- DUMMY DATA GENERATOR ---
-    print("[WARNING] Generating DUMMY data for simulation purposes...")
-    avg_rate = 100000 # 100 kHz count rate
-    total_time = 300  # 300 seconds (5 minutes) to allow stationarity chunking
-    num_events = avg_rate * total_time
+    #P Channel 2 is typically Alice's detector arm.
+    timestamps = load_ttbin_data(FILENAME, target_channel=2)
     
-    intervals = np.random.exponential(1/avg_rate, num_events)
-    timestamps = np.cumsum(intervals)
-    # ------------------------------------
-
     if len(timestamps) > 0:
-        # 1. Macro Test
+        print("\n-> Engaging Statistical Physics Validators...")
+        
+        # 1. Macro Test: Poisson distribution at 10 milliseconds
         test_poissonian_statistics(timestamps, time_window=0.01) 
         
-        # 2. Micro Test
-        test_uniform_approximation(timestamps, micro_bin_width=50e-9) 
+        # 2. Micro Test: Uniformity at a 20 nanoseconds scale
+        test_uniform_approximation(timestamps, micro_bin_width=20e-9) 
         
-        # 3. Stationarity Test
-        # We use 60-second chunks for the 5-minute dummy dataset
+        # 3. Stationarity Test: 10-second blocks for a 60-second file
         test_system_stationarity(timestamps, chunk_duration_sec=60) 
         
-        # Show all accumulated plots at the very end
         print("\n-> Rendering all plots. Close the windows to exit the script.")
         plt.show()
+    else:
+        print("\n[ERROR] No data extracted or file is empty. Pipeline halted.")

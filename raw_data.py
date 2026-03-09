@@ -91,11 +91,12 @@ if __name__ == '__main__':
     TARGET_CHANNELS = [1,2] 
     
     # Output filename. The .ttbin extension stands for TimeTagger Binary.
-    OUTPUT_FILE = "raw_photons.ttbin" 
+    OUTPUT_FILE = "half_raw_photons.ttbin" 
     
     # Experiment duration in seconds.
     # Start with 60 seconds to test the pipeline and evaluate the MB footprint.
-    ACQUISITION_TIME = 60 
-    
+    ACQUISITION_TIME = 1800
+
+
     # Execute the acquisition
     acquire_raw_timestamps(ACQUISITION_TIME, OUTPUT_FILE, TARGET_CHANNELS)
