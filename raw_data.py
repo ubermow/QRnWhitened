@@ -2,14 +2,29 @@ import time
 import os
 import sys
 
-# Import attempt with clear fallback to avoid terminal panic
-try:
-    from TimeTagger import createTimeTagger, FileWriter, freeTimeTagger
-except ImportError:
-    print("[CRITICAL ERROR] TimeTagger module not found.")
-    print("Ensure you are inside your virtual environment (.venv) on Windows")
-    print("and have successfully installed the Swabian Instruments libraries.")
-    sys.exit(1)
+print("=== INITIALIZING HARDWARE BRIDGE ===")
+print(f"-> Using Python: {sys.version.split()[0]}")
+
+# 1. Define the exact paths
+SWABIAN_PYTHON_PATH = r"C:\Program Files\Swabian Instruments\Time Tagger\driver\x64\python3.10"
+SWABIAN_ROOT_PATH = r"C:\Program Files\Swabian Instruments\Time Tagger"
+
+# 2. Add the Python module to sys.path
+if SWABIAN_PYTHON_PATH not in sys.path:
+    sys.path.append(SWABIAN_PYTHON_PATH)
+
+# 3. Add the DLL directories (Crucial for Python 3.8+)
+if hasattr(os, 'add_dll_directory'):
+    print("-> Adding strict DLL directory permissions...") 
+    os.add_dll_directory(SWABIAN_ROOT_PATH)
+    os.add_dll_directory(SWABIAN_PYTHON_PATH)
+
+# 4. Unfiltered Import (If this crashes, we will see the exact C++ error)
+print("-> Importing TimeTagger C++ Engine...")
+from TimeTagger import createTimeTagger, FileWriter, freeTimeTagger
+print("-> Engine Loaded Successfully!\n")
+
+
 
 def acquire_raw_timestamps(duration_sec, filename, channels):
     """
@@ -73,7 +88,7 @@ if __name__ == '__main__':
     
     # Choose the physical (BNC) channels to listen to. 
     # Typically 1 = Detector T (Trigger), 2 = Detector A (Alice).
-    TARGET_CHANNELS = [1, 2] 
+    TARGET_CHANNELS = [1,2] 
     
     # Output filename. The .ttbin extension stands for TimeTagger Binary.
     OUTPUT_FILE = "raw_photons.ttbin" 
