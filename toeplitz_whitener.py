@@ -105,10 +105,10 @@ def whiten_quantum_file(input_filepath, output_filepath, n_in, m_out):
 # MAIN EXECUTION
 # ==========================================
 if __name__ == "__main__":
-    INPUT_FILE = "quantum_bitstream.bin"
-    OUTPUT_FILE = "whitened_quantum_keys.bin"
+    INPUT_FILE = "time_3hraw_bitstream.bin"
+    OUTPUT_FILE = "whitened_t_keys.bin"
     
     # We use n=2048 to process large chunks efficiently.
     # We use m=2000 based on the ML Min-Entropy (H_inf = 0.9969).
     # 2048 * 0.9969 = 2041. We use 2000 to leave a strict safety margin.
-    whiten_quantum_file(INPUT_FILE, OUTPUT_FILE, n_in=2048, m_out=2000)
+    whiten_quantum_file(INPUT_FILE, OUTPUT_FILE, n_in=2048, m_out=2024)
