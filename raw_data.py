@@ -88,14 +88,14 @@ if __name__ == '__main__':
     
     # Choose the physical (BNC) channels to listen to. 
     # Typically 1 = Detector T (Trigger), 2 = Detector A (Alice).
-    TARGET_CHANNELS = [1,2] 
+    TARGET_CHANNELS = [1,2,3] 
     
     # Output filename. The .ttbin extension stands for TimeTagger Binary.
-    OUTPUT_FILE = "half_raw_photons.ttbin" 
+    OUTPUT_FILE = "3h_raw_photons.ttbin"
     
     # Experiment duration in seconds.
     # Start with 60 seconds to test the pipeline and evaluate the MB footprint.
-    ACQUISITION_TIME = 1800
+    ACQUISITION_TIME = 10800  # 3 hours = 10800 seconds
 
 
     # Execute the acquisition
