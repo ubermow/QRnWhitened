@@ -17,6 +17,8 @@ __pycache__/
 *.csv
 *.dat
 *.bin
+*.png
+*.json
 
 # Python Virtual Environments
 .venv/
