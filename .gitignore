@@ -1,1 +1,27 @@
-.gitignore
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# Mac OS system files
+.DS_Store
+
+
+# Virtual Environments
+.venv/
+
+
+# Hardware Data Files
+*.ttbin
+*.idx
+*.csv
+*.dat
+*.bin
+
+# Python Virtual Environments
+.venv/
+qrng_env/
+__pycache__/
+
+# Windows System files
+Thumbs.db
