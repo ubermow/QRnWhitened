@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
-import time
+import os
 
 # ==========================================
 # DELOITTE CORPORATE AESTHETIC CONFIGURATION
@@ -9,215 +8,237 @@ import time
 DELOITTE_GREEN = '#86BC25'
 DELOITTE_BLACK = '#000000'
 DELOITTE_GREY  = '#53565A'
-DELOITTE_LIGHT = '#D0D0CE'
+DELOITTE_RED   = '#DA291C' 
+DELOITTE_BLUE  = '#0097A9' 
 
 plt.rcParams.update({
     'font.family': 'sans-serif',
     'axes.edgecolor': DELOITTE_GREY,
-    'axes.linewidth': 1.0,
-    'xtick.color': DELOITTE_GREY,
-    'ytick.color': DELOITTE_GREY,
     'text.color': DELOITTE_BLACK,
-    'axes.titleweight': 'bold',
-    'figure.facecolor': 'white'
+    'figure.facecolor': 'white',
+    'axes.titlesize': 14,
+    'axes.labelsize': 12,
+    'xtick.labelsize': 10,
+    'ytick.labelsize': 10
 })
 
 # ==========================================
-# GLOBAL CERTIFIED METRICS (275M+ BITS)
+# 1. METRICS EXTRACTION ENGINE (MULTI-LAG)
 # ==========================================
-# We use the mathematical global truth to avoid local 1M-bit variance
-GLOBAL_RAW_P1 = 0.499944
-GLOBAL_WHITE_P1 = 0.499983
-GLOBAL_RAW_SHANNON = 0.99999999
-GLOBAL_WHITE_SHANNON = 1.00000000
-
-def analyze_structural_data(filepath, max_bits=1000000, max_lag=40):
-    """Loads a 1M bit sample specifically for Autocorrelation and Spatial Bitmaps."""
-    bytes_to_read = max_bits // 8
-    try:
-        with open(filepath, 'rb') as f:
-            raw_bytes = np.frombuffer(f.read(bytes_to_read), dtype=np.uint8)
-        bitstream = np.unpackbits(raw_bytes)[:max_bits]
-    except FileNotFoundError:
+def extract_metrics(filepath):
+    if not os.path.exists(filepath):
+        print(f"[WARNING] File not found: {filepath}")
         return None
 
-    # Autocorrelation (Local Sample)
-    mean, var = np.mean(bitstream), np.var(bitstream)
-    lags = np.arange(1, max_lag + 1)
-    if var > 0:
-        autocorr = [np.mean((bitstream[:-lag] - mean) * (bitstream[lag:] - mean)) / var for lag in lags]
-    else:
-        autocorr = np.zeros(max_lag)
+    raw_bytes = np.fromfile(filepath, dtype=np.uint8)
+    bitstream = np.unpackbits(raw_bytes)
+    
+    n = len(bitstream)
+    if n < 10000: return None
 
-    # Bitmap (First 40,000 bits)
-    bitmap_data = bitstream[:40000].reshape((100, 400))
+    # Distribution and Bias
+    p_1 = np.mean(bitstream)
+    p_0 = 1.0 - p_1
+    bias_deviation = abs(p_1 - 0.5)
 
-    return {'lags': lags, 'autocorr': np.array(autocorr), 'bitmap': bitmap_data, 'sample_size': len(bitstream)}
+    # Multi-Lag Autocorrelation (Lags 1, 2, 3)
+    autocorr = {}
+    for lag in [1, 2, 3]:
+        x_current = bitstream[:-lag]
+        x_shifted = bitstream[lag:]
+        matrix = np.corrcoef(x_current, x_shifted)
+        # Floor to 1e-8 to prevent log(0) graphing errors for perfect strings
+        autocorr[lag] = max(abs(matrix[0, 1]), 1e-8)
 
-def generate_full_report(raw_file, whitened_file, max_bits=1000000):
-    print("\n=== QUANTUM VISUAL AUDITOR ENGINE ===")
-    
-    raw_data = analyze_structural_data(raw_file, max_bits)
-    white_data = analyze_structural_data(whitened_file, max_bits)
-    
-    if not raw_data or not white_data:
-        print("[ERROR] Missing binary files. Aborting.")
-        return
+    return {
+        'p_0': p_0,
+        'p_1': p_1,
+        'bias': bias_deviation,
+        'autocorr': autocorr,
+        'bytes': len(raw_bytes),
+        'bits': n,
+        'bitstream_sample': bitstream[:10000] 
+    }
 
-    print("-> Data loaded. Generating isolated plots...")
+# ==========================================
+# 2. ANALYTICAL PLOTTING FUNCTIONS
+# ==========================================
 
-    # ---------------------------------------------------------
-    # PLOT 1: GLOBAL BIAS DEVIATION (ERROR)
-    # ---------------------------------------------------------
-    fig1, ax1 = plt.subplots(figsize=(8, 6))
-    labels = ['Raw Hardware (Global)', 'Toeplitz Whitened (Global)']
+def plot_1_logarithmic_bias(metrics_dict):
+    """Plot 1: Logarithmic Bias Analysis (The 'Microscope' view)"""
+    fig, ax = plt.subplots(figsize=(10, 6))
+    labels = ['Spatial\nRaw', 'Spatial\nWhitened', 'Temporal\nRaw', 'Temporal\nWhitened']
     
-    raw_dev = abs(GLOBAL_RAW_P1 - 0.5)
-    white_dev = abs(GLOBAL_WHITE_P1 - 0.5)
-    dev_values = [raw_dev, white_dev]
+    bias_vals = [
+        max(metrics_dict['Spatial Raw']['bias'], 1e-8),
+        max(metrics_dict['Spatial Whitened']['bias'], 1e-8),
+        max(metrics_dict['Temporal Raw']['bias'], 1e-8),
+        max(metrics_dict['Temporal Whitened']['bias'], 1e-8)
+    ]
     
-    bars = ax1.bar(labels, dev_values, color=[DELOITTE_GREY, DELOITTE_GREEN], width=0.4)
-    ax1.set_title('Global Bias Deviation from Ideal (Lower is Better)', fontsize=14, pad=15)
-    ax1.set_ylabel('Absolute Error |P(1) - 0.5|')
-    ax1.set_ylim(0, max(dev_values) * 1.3)
+    x = np.arange(len(labels))
+    colors = [DELOITTE_GREY, DELOITTE_GREEN, DELOITTE_GREY, DELOITTE_GREEN]
+
+    bars = ax.bar(x, bias_vals, width=0.5, color=colors)
+
+    ax.set_ylabel('Absolute Bias |P(1) - 0.5|')
+    ax.set_title('Cryptographic Purification: Logarithmic Bias Eradication', pad=20, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontweight='bold')
+    ax.set_yscale('log')
     
-    for bar, d in zip(bars, dev_values):
-        ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + (max(dev_values)*0.02), 
-                 f'{d:.6f}', ha='center', fontweight='bold')
-    
-    ax1.spines['top'].set_visible(False)
-    ax1.spines['right'].set_visible(False)
+    n_bits = metrics_dict['Spatial Whitened']['bits']
+    noise_floor = 1.0 / np.sqrt(n_bits)
+    ax.axhline(y=noise_floor, color=DELOITTE_RED, linestyle='--', alpha=0.7, 
+               label=f'Finite Sample Limit ($1/\\sqrt{{N}}$) $\\approx$ {noise_floor:.2e}')
+
+    for bar in bars:
+        height = bar.get_height()
+        ax.annotate(f'{height:.2e}', xy=(bar.get_x() + bar.get_width() / 2, height),
+                    xytext=(0, 5), textcoords="offset points", ha='center', va='bottom', fontsize=10, fontweight='bold')
+
+    ax.legend(loc='upper right')
+    ax.grid(axis='y', alpha=0.3, which='both')
     plt.tight_layout()
-    plt.savefig('1_bias_deviation_comparison.png', dpi=300)
+    plt.savefig('plot_1_log_bias.png', dpi=300)
     plt.close()
-    print("   [+] Saved: 1_bias_deviation_comparison.png")
 
-    # ---------------------------------------------------------
-    # PLOT 2: AUTOCORRELATION
-    # ---------------------------------------------------------
-    fig2, (ax2_raw, ax2_white) = plt.subplots(1, 2, figsize=(14, 5))
-    fig2.suptitle('Serial Autocorrelation Comparison (1M Bit Sample)', fontsize=16, y=1.05)
-    conf_interval = 1.96 / np.sqrt(max_bits)
+def plot_2_multi_lag_autocorr(metrics_dict):
+    """Plot 2: Multi-Lag Autocorrelation (Depths 1, 2, 3) with NIST Bounds"""
+    fig, axs = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
+    lags = [1, 2, 3]
+    x = np.arange(len(lags))
+    width = 0.35
 
-    ax2_raw.stem(raw_data['lags'], raw_data['autocorr'], basefmt=" ", linefmt=DELOITTE_GREY, markerfmt='o')
-    plt.setp(ax2_raw.collections[0], color=DELOITTE_GREY)
-    ax2_raw.set_title('Raw Hardware Memory')
+    # Target number of bits for statistical bounds
+    n_bits = metrics_dict['Spatial Whitened']['bits']
+    sigma = 1.0 / np.sqrt(n_bits)
+    three_sigma = 3.0 * sigma
 
-    ax2_white.stem(white_data['lags'], white_data['autocorr'], basefmt=" ", linefmt=DELOITTE_GREEN, markerfmt='o')
-    plt.setp(ax2_white.collections[0], color=DELOITTE_GREEN)
-    ax2_white.set_title('Whitened Cryptographic Purity')
+    domains = [
+        ('Spatial', metrics_dict['Spatial Raw'], metrics_dict['Spatial Whitened'], axs[0]),
+        ('Temporal', metrics_dict['Temporal Raw'], metrics_dict['Temporal Whitened'], axs[1])
+    ]
 
-    for ax in [ax2_raw, ax2_white]:
-        ax.axhline(0, color=DELOITTE_BLACK, linewidth=1)
-        ax.fill_between(raw_data['lags'], -conf_interval, conf_interval, color=DELOITTE_LIGHT, alpha=0.3)
-        ax.set_ylim(-0.005, 0.005)
-        ax.set_xlabel('Lag (bits)')
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+    for title, raw_data, white_data, ax in domains:
+        raw_vals = [raw_data['autocorr'][l] for l in lags]
+        white_vals = [white_data['autocorr'][l] for l in lags]
 
+        bars_raw = ax.bar(x - width/2, raw_vals, width, label=f'Raw', color=DELOITTE_GREY)
+        bars_white = ax.bar(x + width/2, white_vals, width, label=f'Whitened', color=DELOITTE_GREEN)
+
+        ax.set_title(f'{title} Domain Memory Suppression', fontweight='bold')
+        ax.set_xticks(x)
+        ax.set_xticklabels([f'Lag {l}' for l in lags], fontweight='bold')
+        ax.set_yscale('log')
+
+        ax.axhline(y=sigma, color=DELOITTE_GREY, linestyle='--', alpha=0.7, label=f'1$\\sigma$ Fluctuation')
+        ax.axhline(y=three_sigma, color=DELOITTE_RED, linestyle='-', alpha=0.8, label=f'3$\\sigma$ NIST Limit')
+
+        for bars in [bars_raw, bars_white]:
+            for bar in bars:
+                height = bar.get_height()
+                ax.annotate(f'{height:.1e}', xy=(bar.get_x() + bar.get_width() / 2, height),
+                            xytext=(0, 5), textcoords="offset points", ha='center', va='bottom', fontsize=8)
+
+        ax.grid(axis='y', alpha=0.3, which='both')
+        ax.legend(loc='upper right')
+
+    axs[0].set_ylabel('Absolute Serial Autocorrelation')
+    # Set y-limits to ensure everything is visible
+    axs[0].set_ylim(bottom=1e-8, top=1e-1)
+
+    plt.suptitle('Deep-Lag Cryptographic Autocorrelation Analysis', fontsize=16, fontweight='bold', y=1.02)
     plt.tight_layout()
-    plt.savefig('2_autocorrelation_comparison.png', dpi=300)
+    plt.savefig('plot_2_multilag_autocorr.png', dpi=300, bbox_inches='tight')
     plt.close()
-    print("   [+] Saved: 2_autocorrelation_comparison.png")
 
-    # ---------------------------------------------------------
-    # PLOT 3: BITMAPS
-    # ---------------------------------------------------------
-    fig3, (ax3_raw, ax3_white) = plt.subplots(1, 2, figsize=(14, 5))
-    fig3.suptitle('2D Spatial Entropy Representation', fontsize=16, y=1.05)
+def plot_3_visual_bitstream(metrics_dict):
+    """Plot 3: The 'TV Static' 2D Canvas of the Spatial bits"""
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
     
-    ax3_raw.imshow(raw_data['bitmap'], cmap=ListedColormap(['#ffffff', DELOITTE_GREY]), aspect='auto', interpolation='nearest')
-    ax3_raw.set_title('Raw Bits')
-    ax3_raw.axis('off')
+    raw_matrix = metrics_dict['Spatial Raw']['bitstream_sample'].reshape(100, 100)
+    whitened_matrix = metrics_dict['Spatial Whitened']['bitstream_sample'].reshape(100, 100)
+    
+    cmap = plt.cm.colors.ListedColormap(['#FFFFFF', DELOITTE_GREEN])
+    
+    axs[0].imshow(raw_matrix, cmap=cmap, interpolation='none')
+    axs[0].set_title('Spatial Raw (Hardware Artifacts)', fontweight='bold')
+    axs[0].axis('off')
+    
+    axs[1].imshow(whitened_matrix, cmap=cmap, interpolation='none')
+    axs[1].set_title('Spatial Whitened (Cryptographic Uniformity)', fontweight='bold')
+    axs[1].axis('off')
 
-    ax3_white.imshow(white_data['bitmap'], cmap=ListedColormap(['#ffffff', DELOITTE_GREEN]), aspect='auto', interpolation='nearest')
-    ax3_white.set_title('Whitened Bits')
-    ax3_white.axis('off')
-
+    plt.suptitle('Bitstream Canvas Representation (10,000 bits)', fontsize=16, fontweight='bold')
     plt.tight_layout()
-    plt.savefig('3_bitmap_comparison.png', dpi=300)
+    plt.savefig('plot_3_visual_canvas.png', dpi=300)
     plt.close()
-    print("   [+] Saved: 3_bitmap_comparison.png")
 
-    # ---------------------------------------------------------
-    # PLOT 4: THE UNIFIED GLOBAL DASHBOARD
-    # ---------------------------------------------------------
-    print("-> Rendering Unified Global Dashboard...")
-    fig4 = plt.figure(figsize=(16, 11))
-    fig4.suptitle('Quantum Entropy Extractor: Complete Architecture Audit', 
-                 fontsize=18, fontweight='bold', color=DELOITTE_BLACK, y=0.96)
+def plot_4_global_yield(metrics_dict):
+    """Plot 4: The Combined Spatial + Temporal Yield"""
+    fig, ax = plt.subplots(figsize=(8, 6))
+    
+    spatial_mb = metrics_dict['Spatial Whitened']['bytes'] / (1024 * 1024)
+    temporal_mb = metrics_dict['Temporal Whitened']['bytes'] / (1024 * 1024)
+    
+    categories = ['Cryptographic Yield']
+    
+    p1 = ax.bar(categories, [spatial_mb], color=DELOITTE_BLUE, label=f'Spatial Yield', width=0.4)
+    p2 = ax.bar(categories, [temporal_mb], bottom=[spatial_mb], color=DELOITTE_GREEN, label=f'Temporal Yield', width=0.4)
+    
+    total_mb = spatial_mb + temporal_mb
+    
+    ax.set_ylabel('Certified Randomness (Megabytes)')
+    ax.set_title('Global Entropy Harvesting (Multi-Dimensional)', pad=20, fontweight='bold')
+    ax.set_ylim(0, total_mb * 1.25)
+    
+    ax.text(0, total_mb + (total_mb * 0.03), f'Total Valid Entropy:\n{total_mb:.2f} MB', 
+            ha='center', va='bottom', fontweight='bold', color=DELOITTE_BLACK)
+    
+    if spatial_mb > 0:
+        ax.text(0, spatial_mb / 2, f'{spatial_mb:.2f} MB', ha='center', va='center', color='white', fontweight='bold')
+    if temporal_mb > 0:
+        ax.text(0, spatial_mb + (temporal_mb / 2), f'{temporal_mb:.2f} MB', ha='center', va='center', color='white', fontweight='bold')
 
-    gs = fig4.add_gridspec(3, 2, height_ratios=[1.2, 1, 1], hspace=0.4, wspace=0.2)
-
-    # Dashboard Row 1: Bias Error & Summary Text
-    ax4_bias = fig4.add_subplot(gs[0, 0])
-    bars_dash = ax4_bias.bar(labels, dev_values, color=[DELOITTE_GREY, DELOITTE_GREEN], width=0.5)
-    ax4_bias.set_title('Global Bias Deviation |P(1) - 0.5|', fontsize=12)
-    ax4_bias.set_ylim(0, max(dev_values) * 1.3)
-    ax4_bias.set_ylabel('Absolute Error')
-    for bar, d in zip(bars_dash, dev_values):
-        ax4_bias.text(bar.get_x() + bar.get_width()/2, bar.get_height() + (max(dev_values)*0.02), 
-                     f'{d:.6f}', ha='center', fontweight='bold')
-    ax4_bias.spines['top'].set_visible(False)
-    ax4_bias.spines['right'].set_visible(False)
-
-    ax4_text = fig4.add_subplot(gs[0, 1])
-    ax4_text.axis('off')
-    summary_text = (
-        f"CRYPTOGRAPHIC YIELD SUMMARY\n"
-        f"{'-'*40}\n"
-        f"Global Dataset: >275,000,000 bits\n"
-        f"Sample Dataset: 1,000,000 bits\n\n"
-        f"[RAW HARDWARE STATE]\n"
-        f"Shannon Entropy : {GLOBAL_RAW_SHANNON:.8f}\n"
-        f"Bias Deviation  : {raw_dev:.6f}\n\n"
-        f"[TOEPLITZ WHITENED STATE]\n"
-        f"Shannon Entropy : {GLOBAL_WHITE_SHANNON:.8f}\n"
-        f"Bias Deviation  : {white_dev:.6f}\n"
-    )
-    bbox_props = dict(boxstyle="square,pad=1.5", fc="#f8f9fa", ec=DELOITTE_GREY, lw=1)
-    ax4_text.text(0.1, 0.5, summary_text, fontsize=12, family='monospace', 
-                 verticalalignment='center', bbox=bbox_props)
-
-    # Dashboard Row 2: Autocorrelation
-    ax4_auto_raw = fig4.add_subplot(gs[1, 0])
-    ax4_auto_raw.stem(raw_data['lags'], raw_data['autocorr'], basefmt=" ", linefmt=DELOITTE_GREY, markerfmt='o')
-    plt.setp(ax4_auto_raw.collections[0], color=DELOITTE_GREY)
-    ax4_auto_raw.axhline(0, color=DELOITTE_BLACK, linewidth=1)
-    ax4_auto_raw.fill_between(raw_data['lags'], -conf_interval, conf_interval, color=DELOITTE_LIGHT, alpha=0.3)
-    ax4_auto_raw.set_title('Raw Autocorrelation', fontsize=12)
-
-    ax4_auto_white = fig4.add_subplot(gs[1, 1])
-    ax4_auto_white.stem(white_data['lags'], white_data['autocorr'], basefmt=" ", linefmt=DELOITTE_GREEN, markerfmt='o')
-    plt.setp(ax4_auto_white.collections[0], color=DELOITTE_GREEN)
-    ax4_auto_white.axhline(0, color=DELOITTE_BLACK, linewidth=1)
-    ax4_auto_white.fill_between(white_data['lags'], -conf_interval, conf_interval, color=DELOITTE_LIGHT, alpha=0.3)
-    ax4_auto_white.set_title('Whitened Autocorrelation', fontsize=12)
-
-    for ax in [ax4_auto_raw, ax4_auto_white]:
-        ax.set_ylim(-0.005, 0.005)
-        ax.set_xlabel('Lag (bits)')
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-
-    # Dashboard Row 3: Bitmaps
-    ax4_img_raw = fig4.add_subplot(gs[2, 0])
-    ax4_img_raw.imshow(raw_data['bitmap'], cmap=ListedColormap(['#ffffff', DELOITTE_GREY]), aspect='auto', interpolation='nearest')
-    ax4_img_raw.set_title('Raw Spatial Representation', fontsize=12)
-    ax4_img_raw.axis('off')
-
-    ax4_img_white = fig4.add_subplot(gs[2, 1])
-    ax4_img_white.imshow(white_data['bitmap'], cmap=ListedColormap(['#ffffff', DELOITTE_GREEN]), aspect='auto', interpolation='nearest')
-    ax4_img_white.set_title('Whitened Spatial Representation', fontsize=12)
-    ax4_img_white.axis('off')
+    ax.legend(loc='upper right')
+    ax.grid(axis='y', alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig('4_master_dashboard_comparison.png', dpi=300)
-    print("   [+] Saved: 4_master_dashboard_comparison.png")
-    print("=== EXPORT COMPLETE ===")
+    plt.savefig('plot_4_global_yield.png', dpi=300)
+    plt.close()
 
+# ==========================================
+# MAIN SCRIPT EXECUTION
+# ==========================================
 if __name__ == "__main__":
-    RAW_FILE = "quantum_bitstream.bin"
-    WHITENED_FILE = "whitened_quantum_keys.bin"
+    print("=== DELOITTE QRNG: GENERATING FULL ANALYTICAL SUITE ===")
     
-    generate_full_report(RAW_FILE, WHITENED_FILE, max_bits=1000000)
+    # Check your specific file paths
+    files = {
+        'Spatial Raw': r"data\\raw\\3hours_nopeople\\spatial_3hraw_bitstream.bin",
+        'Spatial Whitened': r"data\\whitened\\final_attempt\\pure_3hs_keys.bin",
+        'Temporal Raw': r"data\\raw\\3hours_nopeople\\time_2c_3hraw_bitstream.bin",
+        'Temporal Whitened': r"data\\whitened\\final_attempt\\pure_3ht_keys.bin"
+    }
+    
+    data = {}
+    for name, path in files.items():
+        metrics = extract_metrics(path)
+        if metrics:
+            data[name] = metrics
+            print(f"[OK] Processed {name}")
+            
+    if len(data) == 4:
+        print("\n-> All data loaded. Generating plots...")
+        plot_1_logarithmic_bias(data)
+        print("   - Created: plot_1_log_bias.png")
+        plot_2_multi_lag_autocorr(data)
+        print("   - Created: plot_2_multilag_autocorr.png")
+        plot_3_visual_bitstream(data)
+        print("   - Created: plot_3_visual_canvas.png")
+        plot_4_global_yield(data)
+        print("   - Created: plot_4_global_yield.png")
+        print("\n=== PLOT GENERATION COMPLETE ===")
+    else:
+        print("\n[ERROR] Missing files. Cannot generate complete comparative plots.")
