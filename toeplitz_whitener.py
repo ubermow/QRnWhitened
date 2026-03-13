@@ -1,13 +1,17 @@
 import time
 import numpy as np
+import os
 from scipy.linalg import toeplitz
 
-class ToeplitzExtractor:
+# ==========================================
+# 1. INDUSTRIAL TOEPLITZ EXTRACTOR
+# ==========================================
+class StreamingToeplitzExtractor:
     def __init__(self, n_input, m_output):
         """
-        Initializes the Toeplitz Strong Extractor.
-        n_input: length of the raw input bit sequence (n)
-        m_output: length of the extracted output bit sequence (m)
+        Initializes a RAM-efficient, high-speed Toeplitz Extractor.
+        n_input: length of raw block (n)
+        m_output: length of output block (m)
         """
         self.n = n_input
         self.m = m_output
@@ -15,12 +19,9 @@ class ToeplitzExtractor:
         self.matrix = None
 
     def generate_matrix(self, seed=None):
-        """
-        Generates the Toeplitz matrix based on the provided seed.
-        """
         if seed is None:
-            # We use an internal pseudo-random seed for the matrix.
-            # In a strict QKD setup, this seed would be shared publicly between Alice and Bob.
+            # Deterministic pseudo-random seed for reproducibility during testing
+            np.random.seed(42) 
             seed = np.random.randint(2, size=self.seed_length, dtype=np.int8)
         elif len(seed) != self.seed_length:
             raise ValueError(f"Seed must be exactly {self.seed_length} bits long.")
@@ -28,87 +29,94 @@ class ToeplitzExtractor:
         first_col = seed[:self.m]
         first_row = seed[self.m - 1:]
         
-        # We enforce np.int8 to save RAM during the massive matrix multiplications
         self.matrix = toeplitz(c=first_col, r=first_row).astype(np.int8)
-        print(f"[ToeplitzExtractor] Generated {self.m}x{self.n} matrix.")
-        
+        print(f"[Extractor] Generated {self.m}x{self.n} Toeplitz Matrix.")
         return self.matrix
 
-    def extract_batch(self, raw_bit_matrix):
+    def process_chunk(self, raw_bit_chunk):
         """
-        Performs extraction on thousands of blocks simultaneously.
-        raw_bit_matrix shape: (num_blocks, n_input)
+        Processes a single block of RAM-safe data using vectorized BLAS operations.
         """
-        if self.matrix is None:
-            raise RuntimeError("Matrix not generated.")
-        
-        # We transpose the raw_bit_matrix to align with the Toeplitz matrix,
-        # perform the dot product, transpose back, and apply Modulo 2.
-        # This simulates the parallel XOR gates of an FPGA.
-        extracted_matrix = np.dot(self.matrix, raw_bit_matrix.T).T % 2
+        # np.dot is extremely fast here because it calls underlying C-level BLAS routines.
+        extracted_matrix = np.dot(raw_bit_chunk, self.matrix.T) % 2
         return extracted_matrix.astype(np.uint8)
 
 # ==========================================
-# FILE PROCESSING PIPELINE
+# 2. STREAMING PIPELINE ENGINE
 # ==========================================
-def whiten_quantum_file(input_filepath, output_filepath, n_in, m_out):
-    print(f"\n=== QUANTUM TOEPLITZ WHITENING ===")
+def whiten_gigabyte_file(input_filepath, output_filepath, n_in=2048, m_out=1920, chunk_mb=50):
+    """
+    Reads huge files in chunks to prevent RAM explosion.
+    """
+    print(f"\n=== QUANTUM TOEPLITZ STREAMING ENGINE ===")
     print(f"-> Source: {input_filepath}")
+    
+    if not os.path.exists(input_filepath):
+        print(f"[CRITICAL] File missing: {input_filepath}")
+        return
+
+    file_size_bytes = os.path.getsize(input_filepath)
+    print(f"-> Target Size: {file_size_bytes / (1024*1024):.2f} MB")
+    
+    extractor = StreamingToeplitzExtractor(n_input=n_in, m_output=m_out)
+    extractor.generate_matrix()
+    
+    # Calculate bytes per chunk
+    bytes_per_chunk = chunk_mb * 1024 * 1024
+    total_processed_bits = 0
+    total_whitened_bytes = 0
     
     start_time = time.time()
     
-    # 1. Load the raw bitstream
-    try:
-        raw_bytes = np.fromfile(input_filepath, dtype=np.uint8)
-        bitstream = np.unpackbits(raw_bytes)
-        total_raw_bits = len(bitstream)
-        print(f"-> Loaded {total_raw_bits:,} raw bits.")
-    except FileNotFoundError:
-        print(f"[ERROR] Could not find {input_filepath}.")
-        return
+    # Open both files: Read raw in binary, write whitened in binary appending
+    with open(input_filepath, 'rb') as f_in, open(output_filepath, 'wb') as f_out:
+        print(f"-> Commencing stream (Chunk size: {chunk_mb} MB)...")
+        
+        while True:
+            # Read a safe chunk of bytes
+            raw_bytes = f_in.read(bytes_per_chunk)
+            if not raw_bytes:
+                break  # EOF Reached
+                
+            chunk_array = np.frombuffer(raw_bytes, dtype=np.uint8)
+            bitstream = np.unpackbits(chunk_array)
+            
+            # Drop remainder bits that don't fit into a perfect block
+            num_blocks = len(bitstream) // n_in
+            if num_blocks == 0:
+                continue
+                
+            usable_bits = num_blocks * n_in
+            bitstream_chopped = bitstream[:usable_bits].reshape((num_blocks, n_in))
+            
+            # 1. Crush blocks through the Toeplitz matrix
+            whitened_blocks = extractor.process_chunk(bitstream_chopped)
+            
+            # 2. Flatten, pack back into bytes, and stream to SSD
+            whitened_flat = whitened_blocks.flatten()
+            packed_whitened_bytes = np.packbits(whitened_flat)
+            f_out.write(packed_whitened_bytes.tobytes())
+            
+            # Metrics update
+            total_processed_bits += usable_bits
+            total_whitened_bytes += len(packed_whitened_bytes)
+            
+            print(f"   ... Processed {total_processed_bits / 1_000_000:.2f} M bits | "
+                  f"Extracted {total_whitened_bytes / (1024*1024):.2f} MB", end='\r')
 
-    # 2. Calculate Block Mathematics
-    # We drop the tiny remainder of bits at the end of the file that don't fit into a full block
-    num_blocks = total_raw_bits // n_in
-    usable_bits = num_blocks * n_in
-    
-    print(f"-> Slicing into {num_blocks:,} blocks of {n_in} bits...")
-    bitstream_chopped = bitstream[:usable_bits].reshape((num_blocks, n_in))
-
-    # 3. Initialize the Extractor
-    extractor = ToeplitzExtractor(n_input=n_in, m_output=m_out)
-    extractor.generate_matrix()
-
-    # 4. Perform the massive parallel matrix multiplication
-    print(f"-> Crushing blocks through the matrix (Compression Ratio: {m_out/n_in:.4f})...")
-    # For a 33MB file, Numpy can do this in one giant vectorized operation
-    whitened_blocks = extractor.extract_batch(bitstream_chopped)
-
-    # 5. Reassemble and Save
-    print("-> Reassembling purified bitstream...")
-    whitened_flat = whitened_blocks.flatten()
-    
-    packed_whitened_bytes = np.packbits(whitened_flat)
-    
-    with open(output_filepath, 'wb') as f_out:
-        f_out.write(packed_whitened_bytes.tobytes())
-
-    total_whitened_bytes = len(packed_whitened_bytes)
-    
     elapsed_time = time.time() - start_time
-    print(f"\n=== WHITENING COMPLETE ===")
-    print(f"-> Yielded {total_whitened_bytes:,} Bytes of Cryptographic Key.")
+    print(f"\n\n=== STREAMING COMPLETE ===")
+    print(f"-> Final Yield: {total_whitened_bytes / (1024*1024):.2f} MB of Cryptographic Key.")
+    print(f"-> Compression Ratio: {m_out / n_in:.4f}")
+    print(f"-> Execution Time: {elapsed_time:.2f} seconds.")
     print(f"-> Output File: {output_filepath}")
-    print(f"-> Processing Time: {elapsed_time:.2f} seconds.")
 
 # ==========================================
 # MAIN EXECUTION
 # ==========================================
 if __name__ == "__main__":
-    INPUT_FILE = "time_3hraw_bitstream.bin"
-    OUTPUT_FILE = "whitened_t_keys.bin"
-    
-    # We use n=2048 to process large chunks efficiently.
-    # We use m=2000 based on the ML Min-Entropy (H_inf = 0.9969).
-    # 2048 * 0.9969 = 2041. We use 2000 to leave a strict safety margin.
-    whiten_quantum_file(INPUT_FILE, OUTPUT_FILE, n_in=2048, m_out=2024)
+    # Point this to your new 16MB file
+    INPUT_FILE = r"data\\raw\\3hours_nopeople\\spatial_3hraw_bitstream.bin"
+    OUTPUT_FILE = r"pure_3hs_keys.bin"
+
+    whiten_gigabyte_file(INPUT_FILE, OUTPUT_FILE, n_in=2048, m_out=1702, chunk_mb=50)
