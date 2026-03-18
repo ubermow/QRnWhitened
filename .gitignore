@@ -19,6 +19,8 @@ __pycache__/
 *.bin
 *.png
 *.json
+*.txt
+
 
 # Python Virtual Environments
 .venv/
