@@ -49,8 +49,9 @@ pip install torch numpy matplotlib scipy
 ## Execution Flux:
 Step-by-Step Guide,
 
-Phase 1:
+
 # Physical Ingestion & Digitalization
+Phase 1:
 
 1. src/raw_data.py: Ingest the raw binary buffers from the Swabian Time Tagger. 
 
