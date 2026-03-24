@@ -42,12 +42,13 @@ The repository is modularized into specific operational domains:
 ## Environment & Dependencies
 This pipeline operates as a hybrid Windows/Linux system. Python processing is handled via standard environments (e.g., Conda), while cryptographic validation requires a native Linux environment.
 
-Bash# Python Environment Setup
+```Bash
+Python Environment Setup
 conda create -n qrng_env python=3.9
 conda activate qrng_env
 
 pip install torch numpy matplotlib scipy
-
+```
 ## Execution Flux:
 (Step-by-Step Guide)
 
@@ -90,17 +91,19 @@ pip install torch numpy matplotlib scipy
 
 1. NIST SP 800-90B (Min-Entropy Assessment)Used to calculate the $H_{min}$ of the raw quantum hardware.
 
-Bash# Install dependencies
+```Bash 
 sudo apt-get update
 sudo apt-get install -y build-essential libbz2-dev libssl-dev libjsoncpp-dev libdivsufsort-dev libmpfr-dev libgmp-dev
-
+```
 # Clone and compile
+
+```bash
 git clone https://github.com/usnistgov/SP800-90B_EntropyAssessment.git
 
 cd SP800-90B_EntropyAssessment/cpp
 
 make
-
+```
 # Execute non-IID evaluation on unpacked binary (1 bit per symbol)
  
 1. /ea_non_iid -v -c /path/to/your/unpacked_bitstream.bin 
@@ -110,14 +113,15 @@ make
 3. Download the suite from the Official NIST CSRC Website.
 4. Extract the folder and compile the Linux binary:
 
-Bash# 
+```Bash
 cd sts-2.1.2
 make clean
 make
-
+```
 # Execute the assessment
+```Bash
 ./assess 1000000
-
+```
 # Follow prompts: 
 Select [0] for input file,
 write the path of the file,
