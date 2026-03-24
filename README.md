@@ -40,18 +40,20 @@ The repository is modularized into specific operational domains:
 ```
 
 ## Environment & Dependencies
-This pipeline operates as a hybrid Windows/Linux system. Python processing is handled via standard environments (e.g., Conda), while cryptographic validation requires a native Linux environment.Bash# Python Environment Setup
+This pipeline operates as a hybrid Windows/Linux system. Python processing is handled via standard environments (e.g., Conda), while cryptographic validation requires a native Linux environment.
+
+Bash# Python Environment Setup
 conda create -n qrng_env python=3.9
 conda activate qrng_env
 
 pip install torch numpy matplotlib scipy
 
 ## Execution Flux:
-Step-by-Step Guide,
+(Step-by-Step Guide)
 
 
 # Physical Ingestion & Digitalization
-Phase 1:
+*Phase 1* :
 
 1. src/raw_data.py: Ingest the raw binary buffers from the Swabian Time Tagger. 
 
@@ -61,7 +63,7 @@ Phase 1:
 
 4. src/digitalization/spatial_digitalizer.py: Extract raw spatial bitstreams from Channel A/B path selections.
 
-Phase 2: Entropy Auditing (Classical & Adversarial)
+*Phase 2*: Entropy Auditing (Classical & Adversarial)
 
 5. src/entropy_audit/unpack_NISTminH.py: Unpack raw 8-bit binaries into 1-bit-per-symbol binaries required by the NIST SP 800-90B suite.
 
@@ -71,11 +73,11 @@ Phase 2: Entropy Auditing (Classical & Adversarial)
 
 8.visuals/visual_ratioML_est.py & visuals/plot_nistminH.py: Generate executive dashboards comparing physical bounds to the ideal theoretical limit.
 
-Phase 3: Privacy Amplification
+*Phase 3*: Privacy Amplification
 
 9. src/extraction/FFToeplitz.py: Execute the Hybrid FFT-Toeplitz extractor. This script processes 131,072-bit blocks using the dimension-specific extraction ratios derived from Phase 2, minus a strict 128-bit Leftover Hash Lemma (LHL) security penalty.
 
-Phase 4: Final Cryptographic Validation
+*Phase 4*: Final Cryptographic Validation
 
 10. visuals/bin2txt.py: Convert the purified .bin keys into ASCII .txt strings (prevents Endianness errors in legacy C-suites).
 
