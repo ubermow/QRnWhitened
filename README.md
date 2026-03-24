@@ -86,26 +86,43 @@ pip install torch numpy matplotlib scipy
 12. visuals/plot_nist_pval.py & visuals/compare_ntro.py: Plot final P-values, auto-correlation lags, absolute bias, and calculate final MB/s throughput.
   
 
-## How to Exploit NIST Validation LibrariesTo keep this repository lightweight and strictly focused on novel research, the official NIST C/C++ libraries are not tracked here. They must be compiled locally using Windows Subsystem for Linux (WSL - Ubuntu 24.04).
+# How to Exploit NIST Validation LibrariesTo keep this repository lightweight and strictly focused on novel research, the official NIST C/C++ libraries are not tracked here. They must be compiled locally using Windows Subsystem for Linux (WSL - Ubuntu 24.04).
 
-1. NIST SP 800-90B (Min-Entropy Assessment)Used to calculate the $H_{min}$ of the raw quantum hardware.Bash# Install dependencies
+1. NIST SP 800-90B (Min-Entropy Assessment)Used to calculate the $H_{min}$ of the raw quantum hardware.
+
+Bash# Install dependencies
 sudo apt-get update
 sudo apt-get install -y build-essential libbz2-dev libssl-dev libjsoncpp-dev libdivsufsort-dev libmpfr-dev libgmp-dev
 
 # Clone and compile
 git clone https://github.com/usnistgov/SP800-90B_EntropyAssessment.git
+
 cd SP800-90B_EntropyAssessment/cpp
+
 make
 
 # Execute non-IID evaluation on unpacked binary (1 bit per symbol)
-./ea_non_iid -v -c /path/to/your/unpacked_bitstream.bin 1
-2. NIST SP 800-22 (Statistical Test Suite)Used to verify the cryptographic uniformity of the final FFT-whitened output.Download the suite from the Official NIST CSRC Website.Extract the folder and compile the Linux binary:Bashcd sts-2.1.2
+ 
+1. /ea_non_iid -v -c /path/to/your/unpacked_bitstream.bin 
+
+2. NIST SP 800-22 (Statistical Test Suite) Used to verify the cryptographic uniformity of the final FFT-whitened output.
+
+3. Download the suite from the Official NIST CSRC Website.
+4. Extract the folder and compile the Linux binary:
+
+Bash# 
+cd sts-2.1.2
 make clean
 make
 
 # Execute the assessment
 ./assess 1000000
-# Follow prompts: Select [0] for input file, [1] for all tests, and [1] for ASCII format.
+
+# Follow prompts: 
+Select [0] for input file,
+write the path of the file,
+[1] for all tests,
+[1] for ASCII format.
  
  
  
