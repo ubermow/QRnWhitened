@@ -42,8 +42,8 @@ The repository is modularized into specific operational domains:
 ## Environment & Dependencies
 This pipeline operates as a hybrid Windows/Linux system. Python processing is handled via standard environments (e.g., Conda), while cryptographic validation requires a native Linux environment.
 
+*Python Environment Setup*
 ```Bash
-Python Environment Setup
 conda create -n qrng_env python=3.9
 conda activate qrng_env
 
@@ -52,9 +52,7 @@ pip install torch numpy matplotlib scipy
 ## Execution Flux:
 (Step-by-Step Guide)
 
-
-# Physical Ingestion & Digitalization
-*Phase 1* :
+*Phase 1*: Physical Ingestion & Digitalization
 
 1. src/raw_data.py: Ingest the raw binary buffers from the Swabian Time Tagger. 
 
@@ -86,16 +84,19 @@ pip install torch numpy matplotlib scipy
 
 12. visuals/plot_nist_pval.py & visuals/compare_ntro.py: Plot final P-values, auto-correlation lags, absolute bias, and calculate final MB/s throughput.
   
+# How to Exploit NIST Validation Libraries
+ 
+To keep this repository lightweight and strictly focused on novel research, the official NIST C/C++ libraries are not tracked here. They must be compiled locally using Windows Subsystem for Linux (WSL - Ubuntu 24.04).
 
-# How to Exploit NIST Validation LibrariesTo keep this repository lightweight and strictly focused on novel research, the official NIST C/C++ libraries are not tracked here. They must be compiled locally using Windows Subsystem for Linux (WSL - Ubuntu 24.04).
+NIST SP 800-90B (Min-Entropy Assessment)
 
-1. NIST SP 800-90B (Min-Entropy Assessment)Used to calculate the $H_{min}$ of the raw quantum hardware.
+*Used to calculate the $H_{min}$ of the raw quantum hardware.*
 
 ```Bash 
 sudo apt-get update
 sudo apt-get install -y build-essential libbz2-dev libssl-dev libjsoncpp-dev libdivsufsort-dev libmpfr-dev libgmp-dev
 ```
-# Clone and compile
+*Clone and compile*
 
 ```bash
 git clone https://github.com/usnistgov/SP800-90B_EntropyAssessment.git
@@ -104,7 +105,7 @@ cd SP800-90B_EntropyAssessment/cpp
 
 make
 ```
-# Execute non-IID evaluation on unpacked binary (1 bit per symbol)
+*Execute non-IID evaluation on unpacked binary (1 bit per symbol)*
  
 1. /ea_non_iid -v -c /path/to/your/unpacked_bitstream.bin 
 
@@ -118,17 +119,19 @@ cd sts-2.1.2
 make clean
 make
 ```
-# Execute the assessment
+* Execute the assessment*
 ```Bash
 ./assess 1000000
 ```
-# Follow prompts: 
+*Follow prompts*:
+
 Select [0] for input file,
-write the path of the file,
+file's path,
 [1] for all tests,
 [1] for ASCII format.
  
  
  
  
-### AcknowledgmentsThis research and engineering effort was conducted during my internship at Deloitte Portugal Consulting (Cyber and Telecom Networks). Special thanks to the leadership and technical mentors at The Hoop lab for providing the infrastructure, hardware bridging, and strategic guidance necessary to complete this experiment.
+# Acknowledgments
+*This research and engineering effort was conducted during my internship at Deloitte Portugal Consulting (Cyber and Telecom Networks). Special thanks to the leadership and technical mentors at The Hoop lab for providing the infrastructure, hardware bridging, and strategic guidance necessary to complete this experiment.*
