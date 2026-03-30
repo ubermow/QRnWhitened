@@ -73,24 +73,23 @@ def despine_ax(ax):
 # ==========================================
 
 def plot_1_logarithmic_bias(metrics_dict):
-    """Plot 1: 3-Column Compact Bias Analysis"""
+    """Plot 1: High-Sensitivity Logarithmic Bias Analysis"""
     fig, ax = plt.subplots(figsize=(10, 6))
     
     categories = ['Raw Hardware\n(Physical Output)', 'NIST SP 800-90B\n(Standard Ratio)', 'Attention-LSTM\n(AI Ratio)']
     x = np.arange(len(categories))
-    width = 0.35  
+    width = 0.30  # Slimmer bars for a sharper, metrological aesthetic
 
-    def get_bias(key): return max(metrics_dict.get(key, {}).get('bias', 1e-8), 1e-8)
+    def get_bias(key): return max(metrics_dict.get(key, {}).get('bias', 1e-9), 1e-9)
 
     spatial_vals = [get_bias('Spatial Raw'), get_bias('Spatial NIST'), get_bias('Spatial AI')]
     temporal_vals = [get_bias('Temporal Raw'), get_bias('Temporal NIST'), get_bias('Temporal AI')]
     
-    # White edgecolor creates a crisp, professional separation
-    bars_s = ax.bar(x - width/2, spatial_vals, width, label='Spatial Domain', color=DELOITTE_BLUE, alpha=0.95, edgecolor=WHITE, lw=1.5)
-    bars_t = ax.bar(x + width/2, temporal_vals, width, label='Temporal Domain', color=DELOITTE_GREEN, alpha=0.95, edgecolor=WHITE, lw=1.5)
+    bars_s = ax.bar(x - width/2, spatial_vals, width, label='Spatial Domain', color=DELOITTE_BLUE, alpha=0.9, edgecolor=WHITE, lw=1.2)
+    bars_t = ax.bar(x + width/2, temporal_vals, width, label='Temporal Domain', color=DELOITTE_GREEN, alpha=0.9, edgecolor=WHITE, lw=1.2)
 
     ax.set_ylabel('Absolute Bias $|P(1) - 0.5|$', fontweight='bold', labelpad=10)
-    ax.set_title('Cryptographic Purification: Bias Eradication Performance', pad=25, fontweight='bold', color=DELOITTE_DARK)
+    ax.set_title('Cryptographic Purification: High-Precision Bias Eradication', pad=25, fontweight='bold', color=DELOITTE_DARK)
     ax.set_xticks(x)
     ax.set_xticklabels(categories, fontweight='600')
     ax.set_yscale('log')
@@ -98,27 +97,34 @@ def plot_1_logarithmic_bias(metrics_dict):
     n_bits = metrics_dict['Spatial NIST']['bits']
     noise_floor = 1.0 / np.sqrt(n_bits)
     
+    # Dynamic Y-limits to maximize sensitivity and focus on the data spread
+    min_val = min(min(spatial_vals), min(temporal_vals))
+    max_val = max(max(spatial_vals), max(temporal_vals))
+    ax.set_ylim(max(1e-8, min_val * 0.1), max_val * 3)
+    
     # Noise Floor Shading
-    ax.axhspan(1e-9, noise_floor, color=DELOITTE_RED, alpha=0.05, lw=0)
-    ax.axhline(y=noise_floor, color=DELOITTE_RED, linestyle='--', alpha=0.6, lw=1.5,
+    ax.axhspan(1e-9, noise_floor, color=DELOITTE_RED, alpha=0.04, lw=0)
+    ax.axhline(y=noise_floor, color=DELOITTE_RED, linestyle='--', alpha=0.8, lw=1.5,
                label=f'Statistical Limit ($1/\\sqrt{{N}}$) $\\approx$ {noise_floor:.2e}')
 
-    # Value Annotations
+    # High-precision value annotations
     for bars in [bars_s, bars_t]:
         for bar in bars:
             height = bar.get_height()
             if height > 1e-8:
-                ax.annotate(f'{height:.1e}', xy=(bar.get_x() + bar.get_width() / 2, height),
+                ax.annotate(f'{height:.2e}', xy=(bar.get_x() + bar.get_width() / 2, height),
                             xytext=(0, 6), textcoords="offset points", ha='center', va='bottom', 
-                            fontsize=9, fontweight='600', color=DELOITTE_DARK)
+                            fontsize=9, fontweight='bold', color=DELOITTE_DARK)
 
     despine_ax(ax)
-    ax.grid(axis='y', alpha=0.15, linestyle='-')
+    ax.grid(axis='y', alpha=0.2, linestyle=':')
     ax.legend(loc='upper right', bbox_to_anchor=(1.0, 1.05))
     
     plt.tight_layout()
     plt.savefig('plot_1_log_bias.png', dpi=400, bbox_inches='tight')
     plt.close()
+
+
 
 # ==========================================
 # 1. METRICS EXTRACTION ENGINE (UPGRADED)
@@ -170,14 +176,9 @@ def extract_metrics(filepath, max_lags=50):
 # 2. ANALYTICAL PLOTTING FUNCTIONS (UPGRADED)
 # ==========================================
 
-# ... [Keep your existing plot_1_logarithmic_bias here] ...
-
 def plot_2_deep_lag_correlogram(metrics_dict, max_lags=50):
-    """
-    Plot 2: Deep-Lag Autocorrelation Correlogram (Lags 1 to 50)
-    Replaces the 3-lag bar chart and the visual canvas.
-    """
-    fig, axs = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
+    """Plot 2: Deep-Lag Correlogram with Global Legend and Area Fills"""
+    fig, axs = plt.subplots(2, 1, figsize=(14, 9), sharex=True)
     lags = np.arange(1, max_lags + 1)
 
     n_bits = metrics_dict['Spatial NIST']['bits']
@@ -185,50 +186,58 @@ def plot_2_deep_lag_correlogram(metrics_dict, max_lags=50):
     three_sigma = 3.0 * sigma
 
     domains = [
-        ('Spatial Domain Hardware Memory', metrics_dict['Spatial Raw'], metrics_dict['Spatial NIST'], metrics_dict['Spatial AI'], axs[0]),
-        ('Temporal Domain Hardware Memory', metrics_dict['Temporal Raw'], metrics_dict['Temporal NIST'], metrics_dict['Temporal AI'], axs[1])
+        ('Spatial Domain Hardware Memory Suppression', metrics_dict['Spatial Raw'], metrics_dict['Spatial NIST'], metrics_dict['Spatial AI'], axs[0]),
+        ('Temporal Domain Hardware Memory Suppression', metrics_dict['Temporal Raw'], metrics_dict['Temporal NIST'], metrics_dict['Temporal AI'], axs[1])
     ]
 
     for title, raw_data, nist_data, ai_data, ax in domains:
-        # Plotting the raw hardware baseline
-        ax.plot(lags, raw_data['autocorr'], color=DELOITTE_GREY, alpha=0.8, lw=2, 
+        # Raw hardware baseline with subtle fill to visually ground the background noise
+        ax.plot(lags, raw_data['autocorr'], color=DELOITTE_GREY, alpha=0.6, lw=1.5, 
                 label='Raw Hardware Output', zorder=2)
+        ax.fill_between(lags, 1e-9, raw_data['autocorr'], color=DELOITTE_GREY, alpha=0.1, zorder=1)
         
-        # Plotting the NIST and AI whitened outputs using scatter/stem-like markers
-        ax.scatter(lags, nist_data['autocorr'], color=DELOITTE_BLUE, alpha=0.7, s=30, 
-                   label='NIST SP 800-90B Extracted', zorder=3)
-        ax.scatter(lags, ai_data['autocorr'], color=DELOITTE_GREEN, alpha=0.9, s=30, marker='s', 
-                   label='Attention-LSTM Extracted', zorder=4)
+        # NIST and AI whitened outputs with distinct, clear geometric markers
+        ax.scatter(lags, nist_data['autocorr'], color=DELOITTE_BLUE, alpha=0.85, s=40, marker='o',
+                   label='NIST SP 800-90B Extracted', zorder=4)
+        ax.scatter(lags, ai_data['autocorr'], color=DELOITTE_GREEN, alpha=0.95, s=40, marker='d', 
+                   label='Attention-LSTM Extracted', zorder=5)
 
-        ax.set_title(title, fontweight='bold', pad=15)
+        ax.set_title(title, fontweight='bold', pad=10)
         ax.set_yscale('log')
-        ax.set_xlim(0.5, max_lags + 0.5)
+        ax.set_xlim(0, max_lags + 1)
 
         # Statistical Thresholds
-        ax.axhspan(1e-9, three_sigma, color=DELOITTE_RED, alpha=0.05, lw=0, zorder=1)
+        ax.axhspan(1e-9, three_sigma, color=DELOITTE_RED, alpha=0.04, lw=0, zorder=0)
         ax.axhline(y=three_sigma, color=DELOITTE_RED, linestyle='-', alpha=0.6, lw=1.5, 
-                   label=r'NIST $3\sigma$ Bound ($\approx 99.7\%$ confidence)', zorder=1)
-        ax.axhline(y=sigma, color=DELOITTE_RED, linestyle='--', alpha=0.3, lw=1, 
-                   label=r'Statistical Noise Floor ($1\sigma$)', zorder=1)
+                   label=r'NIST $3\sigma$ Bound', zorder=3)
+        ax.axhline(y=sigma, color=DELOITTE_RED, linestyle='--', alpha=0.4, lw=1, 
+                   label=r'Noise Floor ($1\sigma$)', zorder=3)
+
+        # ... [keep everything inside the 'for' loop above this unchanged] ...
 
         despine_ax(ax)
-        ax.grid(axis='both', alpha=0.15, linestyle='-')
-        ax.set_ylabel('Absolute Autocorrelation Coefficient $|r_k|$', fontweight='bold', labelpad=10)
+        ax.grid(axis='both', alpha=0.15, linestyle=':')
+        ax.set_ylabel('Absolute Autocorrelation $|r_k|$', fontweight='bold', labelpad=10)
         
-        # Ensure y-axis accommodates the raw hardware spikes
+        # [!] CORRECTED: Restored the absolute floor to 1e-8 so no data points are cut off
         max_val = max(np.max(raw_data['autocorr']), three_sigma * 5)
         ax.set_ylim(bottom=1e-8, top=max_val * 2)
 
-    axs[0].legend(loc='upper right', bbox_to_anchor=(1.0, 1.15), ncol=2)
     axs[1].set_xlabel('Lag distance $k$ (bits)', fontweight='bold', labelpad=10)
 
-    plt.suptitle('Deep-Lag Cryptographic Autocorrelation Analysis (Lags 1 - 50)', fontsize=18, fontweight='bold', y=1.02)
+    # Global Unified Legend placed strictly in the bottom right empty space
+    handles, labels = axs[0].get_legend_handles_labels()
+    axs[1].legend(handles, labels, loc='lower right', ncol=1, frameon=True, 
+                  facecolor=WHITE, edgecolor='#E0E0E0', fontsize=10, framealpha=0.95)
+
+    # Clean layout with no artificial top padding
     plt.tight_layout()
+    plt.subplots_adjust(hspace=0.15)
     plt.savefig('plot_2_deep_lag_correlogram.png', dpi=400, bbox_inches='tight')
     plt.close()
 
-# ... [Keep your existing plot_4_global_yield here] ...
 
+    
 def plot_4_global_yield(metrics_dict):
     """Plot 4: Compact Grouped Bar Yield Comparison (NIST vs AI)"""
     fig, ax = plt.subplots(figsize=(8, 6))
