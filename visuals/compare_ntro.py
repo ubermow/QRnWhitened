@@ -27,6 +27,100 @@ plt.rcParams.update({
 })
 
 # ==========================================
+# 1. METRICS EXTRACTION ENGINE
+# ==========================================
+def extract_metrics(filepath):
+    if not os.path.exists(filepath):
+        print(f"[WARNING] File not found: {filepath}")
+        return None
+
+    raw_bytes = np.fromfile(filepath, dtype=np.uint8)
+    bitstream = np.unpackbits(raw_bytes)
+    
+    n = len(bitstream)
+    if n < 10000: return None
+
+    p_1 = np.mean(bitstream)
+    p_0 = 1.0 - p_1
+    bias_deviation = abs(p_1 - 0.5)
+
+    autocorr = {}
+    for lag in [1, 2, 3]:
+        x_current = bitstream[:-lag]
+        x_shifted = bitstream[lag:]
+        matrix = np.corrcoef(x_current, x_shifted)
+        autocorr[lag] = max(abs(matrix[0, 1]), 1e-8)
+
+    return {
+        'p_0': p_0,
+        'p_1': p_1,
+        'bias': bias_deviation,
+        'autocorr': autocorr,
+        'bytes': len(raw_bytes),
+        'bits': n,
+        'bitstream_sample': bitstream[:10000] 
+    }
+
+def despine_ax(ax):
+    """Utility to remove top/right borders for a clean, open aesthetic."""
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('#E0E0E0')
+    ax.spines['bottom'].set_color('#E0E0E0')
+
+# ==========================================
+# 2. ANALYTICAL PLOTTING FUNCTIONS
+# ==========================================
+
+def plot_1_logarithmic_bias(metrics_dict):
+    """Plot 1: 3-Column Compact Bias Analysis"""
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    categories = ['Raw Hardware\n(Physical Output)', 'NIST SP 800-90B\n(Standard Ratio)', 'Attention-LSTM\n(AI Ratio)']
+    x = np.arange(len(categories))
+    width = 0.35  
+
+    def get_bias(key): return max(metrics_dict.get(key, {}).get('bias', 1e-8), 1e-8)
+
+    spatial_vals = [get_bias('Spatial Raw'), get_bias('Spatial NIST'), get_bias('Spatial AI')]
+    temporal_vals = [get_bias('Temporal Raw'), get_bias('Temporal NIST'), get_bias('Temporal AI')]
+    
+    # White edgecolor creates a crisp, professional separation
+    bars_s = ax.bar(x - width/2, spatial_vals, width, label='Spatial Domain', color=DELOITTE_BLUE, alpha=0.95, edgecolor=WHITE, lw=1.5)
+    bars_t = ax.bar(x + width/2, temporal_vals, width, label='Temporal Domain', color=DELOITTE_GREEN, alpha=0.95, edgecolor=WHITE, lw=1.5)
+
+    ax.set_ylabel('Absolute Bias $|P(1) - 0.5|$', fontweight='bold', labelpad=10)
+    ax.set_title('Cryptographic Purification: Bias Eradication Performance', pad=25, fontweight='bold', color=DELOITTE_DARK)
+    ax.set_xticks(x)
+    ax.set_xticklabels(categories, fontweight='600')
+    ax.set_yscale('log')
+    
+    n_bits = metrics_dict['Spatial NIST']['bits']
+    noise_floor = 1.0 / np.sqrt(n_bits)
+    
+    # Noise Floor Shading
+    ax.axhspan(1e-9, noise_floor, color=DELOITTE_RED, alpha=0.05, lw=0)
+    ax.axhline(y=noise_floor, color=DELOITTE_RED, linestyle='--', alpha=0.6, lw=1.5,
+               label=f'Statistical Limit ($1/\\sqrt{{N}}$) $\\approx$ {noise_floor:.2e}')
+
+    # Value Annotations
+    for bars in [bars_s, bars_t]:
+        for bar in bars:
+            height = bar.get_height()
+            if height > 1e-8:
+                ax.annotate(f'{height:.1e}', xy=(bar.get_x() + bar.get_width() / 2, height),
+                            xytext=(0, 6), textcoords="offset points", ha='center', va='bottom', 
+                            fontsize=9, fontweight='600', color=DELOITTE_DARK)
+
+    despine_ax(ax)
+    ax.grid(axis='y', alpha=0.15, linestyle='-')
+    ax.legend(loc='upper right', bbox_to_anchor=(1.0, 1.05))
+    
+    plt.tight_layout()
+    plt.savefig('plot_1_log_bias.png', dpi=400, bbox_inches='tight')
+    plt.close()
+
+# ==========================================
 # 1. METRICS EXTRACTION ENGINE (UPGRADED)
 # ==========================================
 def extract_metrics(filepath, max_lags=50):
