@@ -30,11 +30,11 @@ The repository is modularized into specific operational domains:
 ├── src/
 │   ├── raw_data.py          # Swabian data ingestion
 │   ├── digitalization/      # temporal_digitalizer.py, spatial_digitalizer.py
-│   ├── entropy_audit/       # ml_entropy_est.py, unpack_NISTminH.py
+│   ├── entropy_audit/       # nn_min_entro.py, unpack_NISTminH.py
 │   └── extraction/          # FFToeplitz.py
 └── visuals/
     ├── photon_stat.py       # Physical photon profiling
-    ├── visual_ratioML_est.py# AI epoch convergence visualization
+    ├── visuale_nn_minH.py# AI epoch convergence visualization
     ├── compare_ntro.py      # Bias, autocorrelation (Lags 1-3), and throughput
     ├── bin2txt.py           # Binary to ASCII conversion for NIST STS
     ├── plot_nistminH.py     # Executive dashboard for NIST 90B results
@@ -64,7 +64,7 @@ pip install torch numpy matplotlib scipy
 **Phase 2: Entropy Auditing (Classical & Adversarial)**
 5. `src/entropy_audit/unpack_NISTminH.py`: Unpack raw 8-bit binaries into 1-bit-per-symbol binaries required by the NIST SP 800-90B suite.
 6. Execute NIST SP 800-90B (See *How to Exploit NIST Validation Libraries* below) to establish the physical baseline.
-7. `src/entropy_audit/ml_entropy_est.py`: Run the adversarial Attention-LSTM audit to verify the physical bound against deep-learning attacks.
+7. `src/entropy_audit/nn_min_entro.py`: Run the adversarial Attention-LSTM audit to verify the physical bound against deep-learning attacks.
 8. `visuals/visual_ratioML_est.py` & `visuals/plot_nistminH.py`: Generate executive dashboards comparing physical bounds to the ideal theoretical limit.
 
 **Phase 3: Privacy Amplification**
