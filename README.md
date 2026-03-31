@@ -1,5 +1,3 @@
-
-```markdown
 # High-Speed Heralded QRNG with FFT-Accelerated Privacy Amplification
 
 **Author:** Simone Ferilli  
@@ -125,5 +123,3 @@ make
 
 ## Acknowledgments
 *This research and engineering effort was conducted during my internship at Deloitte Portugal Consulting (Cyber and Telecom Networks). Special thanks to the leadership and technical mentors at The Hoop lab for providing the infrastructure, hardware bridging, and strategic guidance necessary to complete this experiment.*
-```
-
