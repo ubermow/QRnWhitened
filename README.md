@@ -3,7 +3,7 @@
 **Author:** Simone Ferilli  
 **Institution:** University of Pisa / Deloitte Portugal Consulting  
 **Department:** Cyber and Telecom Networks — The Hoop Lab  
-**Hardware Platform:** Swabian Time Tagger / EDU-QOP1(/M) Quantum Optics Kit / Lenovo ThinkPad (Deloitte IT)  
+**Hardware Platform:** Swabian Time Tagger / EDU-QOP1(/M) Quantum Optics Kit / Lenovo ThinkPad (Deloitte PT)  
 **Location:** Lisbon, Portugal  
 
 ---
@@ -32,8 +32,9 @@ The repository is modularized into specific operational domains:
 │   └── extraction/          # FFToeplitz.py
 └── visuals/
     ├── photon_stat.py       # Physical photon profiling
-    ├── visuale_nn_minH.py# AI epoch convergence visualization
+    ├── visuale_nn_minH.py   # AI epoch convergence visualization
     ├── compare_ntro.py      # Bias, autocorrelation (Lags 1-3), and throughput
+    ├── spatial_global_plot.py    # Spatial balancing plot generation
     ├── bin2txt.py           # Binary to ASCII conversion for NIST STS
     ├── plot_nistminH.py     # Executive dashboard for NIST 90B results
     └── plot_nist_pval.py    # Visualization of NIST STS P-values
