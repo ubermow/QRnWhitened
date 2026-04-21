@@ -25,10 +25,10 @@ def plot_advanced_nist_audit(h_spatial, h_temporal):
     # 2. Data Preparation
     labels = ['SPATIAL DIMENSION\n(Path Selection)', 'TEMPORAL DIMENSION\n(Inter-arrival Time)']
     values = [h_spatial, h_temporal]
-    bottlenecks = ['Compression Test', 'T-Tuple Test']
+    bottlenecks = ['T-Tuple Test', 'Compression Test']
     physics_labels = [
-        'Detected: Subtle path memory in detector array.', 
-        'Detected: Hardware clock jitter & TDC resolution limitations.'
+       'Detected: Hardware clock jitter & TDC resolution limitations.' , 'Detected: Subtle path memory in detector array.'
+        
     ]
     
     # 3. Layer 1: Plotting the Ideal Standard (The 1.0 Entropy Target)

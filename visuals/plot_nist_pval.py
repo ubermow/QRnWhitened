@@ -166,15 +166,15 @@ def generate_wang_deloitte_plot(temporal_data, spatial_data):
    #           bbox=dict(boxstyle='round,pad=0.8', facecolor='#F5F5F5', edgecolor='#DDDDDD',
    #                    linewidth=0.8, alpha=0.85))
 
-    filename = "NIST_Dual_Dimension_Validation.png"
+    filename = "aiNIST_Dual_Dimension_Validation.png"
     plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
     print(f"[+] High-resolution dual-panel visualization saved: {filename}")
     plt.show()
 
 # ==========================================
 if __name__ == "__main__":
-    FILE_TEMPORAL = r"data\\whitened\\final_attempt\\final4NIST\\time_finalAnalysisReport.txt"
-    FILE_SPATIAL = r"data\\whitened\\final_attempt\\final4NIST\\space_finalAnalysisReport.txt"
+    FILE_TEMPORAL = r"data\\whitened\\final_attempt\\nnNIST\\nn_temporal_finalAnalysisReport.txt"
+    FILE_SPATIAL = r"data\\whitened\\final_attempt\\nnNIST\\nn_spatial_finalAnalysisReport.txt"
 
     data_t = parse_nist_report(FILE_TEMPORAL)
     data_s = parse_nist_report(FILE_SPATIAL)
